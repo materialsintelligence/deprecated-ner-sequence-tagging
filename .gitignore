@@ -1,0 +1,15 @@
+sequence_tagging/*sh
+sequence_tagging/*pyc
+sequence_tagging//data
+sequence_tagging/!/data/.gitkeep
+sequence_tagging/results
+sequence_tagging/*.DS_Store
+.idea/
+sequence_tagging/.idea/
+sequence_tagging/model/.idea/
+sequence_tagging/notebooks/
+sequence_tagging/.ipynb_checkpoints/
+sequence_tagging/logs/*
+sequence_tagging/model/__pycache__/
+sequence_tagging/__pycache__
+sequence_tagging/data/.DS_Store
