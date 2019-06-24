@@ -1,6 +1,7 @@
 import numpy as np
 np.random.seed(1)
 import os
+import requests
 import tensorflow as tf
 tf.set_random_seed(1)
 
@@ -9,13 +10,14 @@ from .general_utils import Progbar
 from .base_model import BaseModel
 
 
-class NERModel(BaseModel):
-    """Specialized class of Model for NER"""
+class NERServingModel(BaseModel):
+    """A variant of ner_model suitable for constructing and using a tf-serving API"""
 
-    def __init__(self, config):
+    def __init__(self, config, api_url):
         super(NERModel, self).__init__(config)
         self.idx_to_tag = {idx: tag for tag, idx in
                            self.config.vocab_tags.items()}
+        self.api_url = api_url
 
 
     def add_placeholders(self):
@@ -244,8 +246,7 @@ class NERModel(BaseModel):
         if self.config.use_crf:
             # get tag scores and transition params of CRF
             viterbi_sequences = []
-            logits, trans_params = self.sess.run(
-                    [self.logits, self.trans_params], feed_dict=fd)
+            logits, trans_params = self._api_call_predict(fd)
 
             # iterate over the sentences because no batching in vitervi_decode
             for logit, sequence_length in zip(logits, sequence_lengths):
@@ -257,125 +258,8 @@ class NERModel(BaseModel):
             return viterbi_sequences, sequence_lengths
 
         else:
-            labels_pred = self.sess.run(self.labels_pred, feed_dict=fd)
+            raise Exception
 
-            return labels_pred, sequence_lengths
-
-
-    def run_epoch(self, train, dev, epoch):
-        """Performs one complete pass over the train set and evaluate on dev
-
-        Args:
-            train: dataset that yields tuple of sentences, tags
-            dev: dataset
-            epoch: (int) index of the current epoch
-
-        Returns:
-            f1: (python float), score to select model on, higher is better
-
-        """
-        # progbar stuff for logging
-        batch_size = self.config.batch_size
-        nbatches = (len(train) + batch_size - 1) // batch_size
-        prog = Progbar(target=nbatches)
-
-        # iterate over dataset
-        for i, (words, labels) in enumerate(minibatches(train, batch_size)):
-            fd, _ = self.get_feed_dict(words, labels, self.config.lr,
-                    self.config.dropout)
-
-            _, train_loss, summary = self.sess.run(
-                    [self.train_op, self.loss, self.merged], feed_dict=fd)
-
-            prog.update(i + 1, [("train loss", train_loss)])
-
-            # tensorboard
-            if i % 10 == 0:
-                self.file_writer.add_summary(summary, epoch*nbatches + i)
-
-        metrics = self.run_evaluate(dev)
-        msg = " - ".join(["{} {:04.2f}".format(k, v)
-                for k, v in metrics.items()])
-        self.logger.info(msg)
-
-        return metrics["f1"]
-
-
-    def run_evaluate(self, test):
-        """Evaluates performance on test set
-
-        Args:
-            test: dataset that yields tuple of (sentences, tags)
-
-        Returns:
-            metrics: (dict) metrics["acc"] = 98.4, ...
-
-        """
-        accs = []
-        correct_preds, total_correct, total_preds = 0., 0., 0.
-        for words, labels in minibatches(test, self.config.batch_size):
-            labels_pred, sequence_lengths = self.predict_batch(words)
-
-            for lab, lab_pred, length in zip(labels, labels_pred,
-                                             sequence_lengths):
-                lab      = lab[:length]
-                lab_pred = lab_pred[:length]
-                accs    += [a==b for (a, b) in zip(lab, lab_pred)]
-
-                lab_chunks      = set(get_chunks(lab, self.config.vocab_tags))
-                lab_pred_chunks = set(get_chunks(lab_pred,
-                                                 self.config.vocab_tags))
-
-                correct_preds += len(lab_chunks & lab_pred_chunks)
-                total_preds   += len(lab_pred_chunks)
-                total_correct += len(lab_chunks)
-
-        p   = correct_preds / total_preds if correct_preds > 0 else 0
-        r   = correct_preds / total_correct if correct_preds > 0 else 0
-        f1  = 2 * p * r / (p + r) if correct_preds > 0 else 0
-        acc = np.mean(accs)
-
-        return {"acc": 100*acc, "f1": 100*f1}
-
-    def evaluate_all(self, test, tag):
-        """Evaluates f1 for each tag on test set
-
-        Args:
-            test: dataset that yields tuple of (sentences, tags)
-            tag: tag to be evaluated
-
-        Returns:
-            metrics: (dict) metrics["acc"] = 98.4, ...
-
-        """
-        accs = []
-        correct_preds, total_correct, total_preds = 0., 0., 0.
-        for words, labels in minibatches(test, self.config.batch_size):
-            labels_pred, sequence_lengths = self.predict_batch(words)
-
-            for lab, lab_pred, length in zip(labels, labels_pred,
-                                             sequence_lengths):
-                lab      = lab[:length]
-                lab_pred = lab_pred[:length]
-                accs    += [a==b for (a, b) in zip(lab, lab_pred)]
-
-                lab_chunks      = set(get_chunks(lab, self.config.vocab_tags))
-                lab_pred_chunks = set(get_chunks(lab_pred,
-                                                 self.config.vocab_tags))
-
-                lab_chunks = set([(l, b, e) for l, b, e in lab_chunks if l == tag])
-                lab_pred_chunks = set([(l, b, e) for l, b, e in lab_pred_chunks if l == tag])
-
-                correct_preds += len(lab_chunks & lab_pred_chunks)
-                total_preds   += len(lab_pred_chunks)
-                total_correct += len(lab_chunks)
-
-
-        p   = correct_preds / total_preds if correct_preds > 0 else 0
-        r   = correct_preds / total_correct if correct_preds > 0 else 0
-        f1  = 2 * p * r / (p + r) if correct_preds > 0 else 0
-
-        return {"label": tag, "f1": 100*f1}
 
 
     def predict(self, words_raw):
@@ -395,3 +279,38 @@ class NERModel(BaseModel):
         preds = [self.idx_to_tag[idx] for idx in list(pred_ids[0])]
 
         return preds
+
+    def _api_call_predict(self,feed_dict):
+        """ Make a call to a tf-serving server implementing the NER model
+
+        Args:
+            feed_dict: dictionary of inputs
+
+        Returns:
+            logits, trans_params
+        """
+
+        r = requests.post(url=self.api_url, data=feed_dict)
+        if r.status == 200:
+            r = r.json()
+            return r['logits'],r['trans_params']
+        else:
+            raise Exception
+    def save_prediction_model(self,save_dir):
+        """Makes a tf saved_model copy of the current NER model
+
+        Args:
+            save_dir: Directory to save the model
+
+        Returns:
+            self
+
+        """
+
+        tf.saved_model.simple_save(
+        self.sess,
+        save_dir,
+        {"word_ids": self.word_ids,"sequence_lengths": self.sequence_lengths,"dropout":self.dropout},
+        {"logits": self.logits,"trans_params":self.trans_params}
+        )
+        return self
