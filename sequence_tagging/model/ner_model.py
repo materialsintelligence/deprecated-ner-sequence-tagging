@@ -397,3 +397,21 @@ class NERModel(BaseModel):
         return preds
 
 
+    def save_prediction_model(self,save_dir):
+        """Makes a tf saved_model copy of the current NER model
+
+        Args:
+            save_dir: Directory to save the model
+
+        Returns:
+            self
+
+        """
+
+        tf.saved_model.simple_save(
+        self.sess,
+        save_dir,
+        {"word_ids": self.word_ids,"sequence_lengths": self.sequence_lengths,"dropout":self.dropout},
+        {"logits": self.logits,"trans_params":self.trans_params}
+        )
+        return self
