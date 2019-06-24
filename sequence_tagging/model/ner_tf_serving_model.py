@@ -123,7 +123,7 @@ class NERServingModel(NERModel):
         tf.saved_model.simple_save(
         self.sess,
         save_dir,
-        {"word_ids": self.word_ids,"sequence_lengths": self.sequence_lengths,"dropout":self.dropout},
+        {"word_ids": self.word_ids,"sequence_lengths": self.sequence_lengths,"dropout":self.dropout,"word_lengths":self.word_lengths,"char_ids":self.char_ids},
         {"logits": self.logits,"trans_params":self.trans_params}
         )
         return self
