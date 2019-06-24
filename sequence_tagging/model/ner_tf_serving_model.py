@@ -102,12 +102,12 @@ class NERServingModel(NERModel):
             logits, trans_params
         """
 
+        print(feed_dict)
         r = requests.post(url=self.api_url, data=feed_dict)
+        print(r)
         if r.status_code == 200:
             r = r.json()
             return r['logits'],r['trans_params']
-        else:
-            raise Exception
 
     def save_prediction_model(self,save_dir):
         """Makes a tf saved_model copy of the current NER model
