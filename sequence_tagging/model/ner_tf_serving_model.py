@@ -74,23 +74,23 @@ class NERServingModel(BaseModel):
 
         # build feed dictionary
         feed = {
-            self.word_ids: word_ids,
-            self.sequence_lengths: sequence_lengths
+            "word_ids": word_ids,
+            "sequence_lengths": sequence_lengths
         }
 
         if self.config.use_chars:
-            feed[self.char_ids] = char_ids
-            feed[self.word_lengths] = word_lengths
+            feed["char_ids"] = char_ids
+            feed["word_lengths"] = word_lengths
 
         if labels is not None:
             labels, _ = pad_sequences(labels, 0)
-            feed[self.labels] = labels
+            feed["labels"] = labels
 
         if lr is not None:
-            feed[self.lr] = lr
+            feed["lr"] = lr
 
         if dropout is not None:
-            feed[self.dropout] = dropout
+            feed["dropout"] = dropout
 
         return feed, sequence_lengths
 
