@@ -17,6 +17,51 @@ class NERServingModel(NERModel):
         super(NERServingModel, self).__init__(config)
         self.api_url = api_url
 
+    def get_feed_dict(self, words, labels=None, lr=None, dropout=None):
+        """Given some data, pad it and build a feed dictionary
+
+        Args:
+            words: list of sentences. A sentence is a list of ids of a list of
+                words. A word is a list of ids
+            labels: list of ids
+            lr: (float) learning rate
+            dropout: (float) keep prob
+
+        Returns:
+            dict {placeholder: value}
+
+        """
+        # perform padding of the given data
+        if self.config.use_chars:
+            char_ids, word_ids = zip(*words)
+            word_ids, sequence_lengths = pad_sequences(word_ids, 0)
+            char_ids, word_lengths = pad_sequences(char_ids, pad_tok=0,
+                nlevels=2)
+        else:
+            word_ids, sequence_lengths = pad_sequences(words, 0)
+
+        # build feed dictionary
+        feed = {
+            "word_ids": word_ids,
+            "sequence_lengths": sequence_lengths
+        }
+
+        if self.config.use_chars:
+            feed["char_ids"] = char_ids
+            feed["word_lengths"] = word_lengths
+
+        if labels is not None:
+            labels, _ = pad_sequences(labels, 0)
+            feed["labels"] = labels
+
+        if lr is not None:
+            feed["lr"] = lr
+
+        if dropout is not None:
+            feed["dropout"] = dropout
+
+        return feed, sequence_lengths
+
 
     def predict_batch(self, words):
         """
