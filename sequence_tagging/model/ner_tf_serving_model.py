@@ -14,7 +14,7 @@ class NERServingModel(BaseModel):
     """A variant of ner_model suitable for constructing and using a tf-serving API"""
 
     def __init__(self, config, api_url):
-        super(NERModel, self).__init__(config)
+        super(NERServingModel, self).__init__(config)
         self.idx_to_tag = {idx: tag for tag, idx in
                            self.config.vocab_tags.items()}
         self.api_url = api_url
