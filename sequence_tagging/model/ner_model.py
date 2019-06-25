@@ -395,5 +395,3 @@ class NERModel(BaseModel):
         preds = [self.idx_to_tag[idx] for idx in list(pred_ids[0])]
 
         return preds
-
-
