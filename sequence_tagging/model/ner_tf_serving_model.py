@@ -103,12 +103,12 @@ class NERServingModel(NERModel):
         """
 
         input_dict = {"inputs":feed_dict}
-        print(input_dict,self.api_url)
         r = requests.post(url=self.api_url, json=input_dict)
-        print(r)
         if r.status_code == 200:
             r = r.json()
-            return r['outputs']['logits'],r['outputs']['trans_params']
+            return np.array(r['outputs']['logits']),np.array(r['outputs']['trans_params'])
+        else:
+            r.raise_for_status()
 
     def save_prediction_model(self,save_dir):
         """Makes a tf saved_model copy of the current NER model
