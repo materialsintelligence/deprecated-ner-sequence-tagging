@@ -103,7 +103,7 @@ class NERServingModel(NERModel):
         """
 
         input_dict = {"inputs":feed_dict}
-        print(input_dict,api_url)
+        print(input_dict,self.api_url)
         r = requests.post(url=self.api_url, json={"inputs":feed_dict})
         print(r)
         if r.status_code == 200:
