@@ -8,7 +8,7 @@ from .data_utils import get_trimmed_glove_vectors, load_vocab, \
 
 class Config():
 
-    def __init__(self, log_path = 'log.txt', load=True):
+    def __init__(self, log_path = 'log.txt', load=True, train=False):
         """Initialize hyperparameters and load vocabs
 
         Args:
@@ -17,11 +17,12 @@ class Config():
 
         """
         # directory for training outputs
-        if not os.path.exists(self.dir_output):
-            os.makedirs(self.dir_output)
+        if train:
+            if not os.path.exists(self.dir_output):
+                os.makedirs(self.dir_output)
 
-        if os.path.exists(log_path):
-            os.remove(log_path)
+            if os.path.exists(log_path):
+                os.remove(log_path)
 
         # create instance of logger
         self.logger = get_logger(log_path)
